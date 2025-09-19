@@ -223,41 +223,40 @@ def plot_symbol(tab, symbol):
 for i, sym in enumerate(symbols): plot_symbol(tabs[i], sym)
 
 # Alarm geçmişi ve indirme
-st.divider(); st.subheader("📜 Alarm Geçmişi")
+st.divider()
+st.subheader("📜 Alarm Geçmişi")
 alerts_df = load_alerts()
+
+# Temizleme seçenekleri
+st.write("🧹 Alarm Geçmişini Temizle:")
+clear_option = st.selectbox("Seçenek:", ["Son 50", "Son 100", "Tümünü Temizle"])
+if st.button("Temizle"):
+    if clear_option == "Son 50":
+        clear_alerts(mode="last_n", n=50)
+    elif clear_option == "Son 100":
+        clear_alerts(mode="last_n", n=100)
+    else:
+        clear_alerts(mode="all")
+    st.success("Alarm geçmişi güncellendi!")
+    st.experimental_rerun()  # sayfayı yenile
+
+# Alarm tablosu ve Excel indirme
 if not alerts_df.empty:
     st.dataframe(alerts_df)
     excel_data = to_excel(alerts_df)
-    st.download_button(label="📥 Alarm Geçmişini Excel Olarak İndir", data=excel_data,
+    st.download_button(label="📥 Alarm Geçmişini Excel Olarak İndir",
+                       data=excel_data,
                        file_name="alarm_gecmisi.xlsx",
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 else:
     st.info("Henüz kaydedilmiş alarm yok.")
 
+from streamlit_autorefresh import st_autorefresh
+st_autorefresh(interval=refresh_seconds * 1000, key="datarefresh")
+
+
 st.caption(f"⏳ Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 time.sleep(int(refresh_seconds))
 st.rerun()
-
-st.subheader("📜 Alarm Geçmişi")
-alerts_df = load_alerts()
-if not alerts_df.empty:
-    st.dataframe(alerts_df)
-    
-    # Temizleme seçenekleri
-    st.write("🧹 Alarm Geçmişini Temizle:")
-    clear_option = st.selectbox("Seçenek:", ["Son 50", "Son 100", "Tümünü Temizle"])
-    if st.button("Temizle"):
-        if clear_option == "Son 50":
-            clear_alerts(mode="last_n", n=50)
-        elif clear_option == "Son 100":
-            clear_alerts(mode="last_n", n=100)
-        else:
-            clear_alerts(mode="all")
-        st.success("Alarm geçmişi güncellendi!")
-        st.experimental_rerun()  # sayfayı yenile
-
-
-
-
 
 
