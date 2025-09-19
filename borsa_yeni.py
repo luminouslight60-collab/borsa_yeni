@@ -88,16 +88,18 @@ def check_alerts(symbol, df, rsi, macd_df, alerts):
     last_close = df["Close"].iloc[-1]
 
     # Fiyat üstü alarm
-    if alerts.get("price_above") is not None:
-        if last_close > alerts["price_above"]:
-            msg = f"🚀 {symbol}: Fiyat {alerts['price_above']} üzerine çıktı! (Şu an: {last_close:.2f})"
+    price_above = alerts.get("price_above")
+    if price_above and pd.notna(price_above):
+        if last_close > price_above:
+            msg = f"🚀 {symbol}: Fiyat {price_above} üzerine çıktı! (Şu an: {last_close:.2f})"
             messages.append(msg)
             save_alert(symbol, msg)
 
     # Fiyat altı alarm
-    if alerts.get("price_below") is not None:
-        if last_close < alerts["price_below"]:
-            msg = f"📉 {symbol}: Fiyat {alerts['price_below']} altına indi! (Şu an: {last_close:.2f})"
+    price_below = alerts.get("price_below")
+    if price_below and pd.notna(price_below):
+        if last_close < price_below:
+            msg = f"📉 {symbol}: Fiyat {price_below} altına indi! (Şu an: {last_close:.2f})"
             messages.append(msg)
             save_alert(symbol, msg)
 
@@ -123,6 +125,7 @@ def check_alerts(symbol, df, rsi, macd_df, alerts):
             messages.append(msg); save_alert(symbol, msg)
 
     return messages
+
 
 
 def to_excel(df):
@@ -209,5 +212,6 @@ else:
 st.caption(f"⏳ Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 time.sleep(int(refresh_seconds))
 st.rerun()
+
 
 
