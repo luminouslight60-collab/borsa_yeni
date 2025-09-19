@@ -8,6 +8,8 @@ import streamlit as st
 import os
 from io import BytesIO
 import platform
+import os
+
 
 # Ses ve sistem bildirimi için
 try:
@@ -137,6 +139,27 @@ def to_excel(df):
         # writer.save() → artık gerek yok
     return output.getvalue()
 
+# Alarm geçmişini yükle
+def load_alerts():
+    log_file = "alerts_log.csv"
+    if os.path.exists(log_file):
+        return pd.read_csv(log_file)
+    else:
+        return pd.DataFrame(columns=["Tarih", "Sembol", "Mesaj"])
+
+# Alarm geçmişini temizle
+def clear_alerts(mode="all", n=50):
+    log_file = "alerts_log.csv"
+    if not os.path.exists(log_file):
+        return
+    df = pd.read_csv(log_file)
+    if mode == "all":
+        df = pd.DataFrame(columns=df.columns)  # tümünü temizle
+    elif mode == "last_n":
+        df = df.iloc[:-n] if len(df) > n else pd.DataFrame(columns=df.columns)
+    df.to_csv(log_file, index=False)
+
+
 # ----------------------
 # Streamlit Arayüzü
 # ----------------------
@@ -214,6 +237,25 @@ else:
 st.caption(f"⏳ Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 time.sleep(int(refresh_seconds))
 st.rerun()
+
+st.subheader("📜 Alarm Geçmişi")
+alerts_df = load_alerts()
+if not alerts_df.empty:
+    st.dataframe(alerts_df)
+    
+    # Temizleme seçenekleri
+    st.write("🧹 Alarm Geçmişini Temizle:")
+    clear_option = st.selectbox("Seçenek:", ["Son 50", "Son 100", "Tümünü Temizle"])
+    if st.button("Temizle"):
+        if clear_option == "Son 50":
+            clear_alerts(mode="last_n", n=50)
+        elif clear_option == "Son 100":
+            clear_alerts(mode="last_n", n=100)
+        else:
+            clear_alerts(mode="all")
+        st.success("Alarm geçmişi güncellendi!")
+        st.experimental_rerun()  # sayfayı yenile
+
 
 
 
