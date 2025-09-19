@@ -24,7 +24,10 @@ except:
 @st.cache_data(ttl=300)
 def fetch_data(ticker, period, interval):
     df = yf.download(ticker, period=period, interval=interval, progress=False)
-    return df.dropna()
+    df = df.dropna()
+    if df.empty:
+        st.warning(f"{ticker} için veri alınamadı.")
+    return df
 
 def compute_ma(df, windows):
     for w in windows:
@@ -32,17 +35,22 @@ def compute_ma(df, windows):
     return df
 
 def compute_rsi(df, period=14):
-    delta = df["Close"].diff()
+    close = df["Close"]
+    if isinstance(close, pd.DataFrame):
+        close = close.squeeze()  # Tek boyuta indir
+    delta = close.diff()
     gain = np.where(delta > 0, delta, 0.0)
     loss = np.where(delta < 0, -delta, 0.0)
-    roll_up = pd.Series(gain, index=df.index).rolling(period).mean()
-    roll_down = pd.Series(loss, index=df.index).rolling(period).mean()
+    roll_up = pd.Series(gain, index=close.index).rolling(period).mean()
+    roll_down = pd.Series(loss, index=close.index).rolling(period).mean()
     rs = roll_up / roll_down
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
 def compute_macd(df, short=12, long=26, signal=9):
     close = df["Close"]
+    if isinstance(close, pd.DataFrame):
+        close = close.squeeze()
     exp1 = close.ewm(span=short, adjust=False).mean()
     exp2 = close.ewm(span=long, adjust=False).mean()
     macd = exp1 - exp2
@@ -60,12 +68,11 @@ def save_alert(symbol, message):
     else:
         updated = new_entry
     updated.to_csv(log_file, index=False)
-    # Sesli uyarı
     try:
         if platform.system() == "Windows":
-            winsound.Beep(1000, 500)  # 1000 Hz, 0.5s
+            winsound.Beep(1000, 500)
         else:
-            subprocess.run(['say', message])  # macOS
+            subprocess.run(['say', message])
     except:
         pass
 
