@@ -111,7 +111,7 @@ def to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Alarmlar')
-        writer.save()
+        # writer.save() → artık gerek yok
     return output.getvalue()
 
 # ----------------------
@@ -191,3 +191,4 @@ else:
 st.caption(f"⏳ Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 time.sleep(int(refresh_seconds))
 st.rerun()
+
