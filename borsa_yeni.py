@@ -93,7 +93,7 @@ def check_alerts(symbol, df, rsi, macd_df, alerts):
 
     # Fiyat üstü alarm
     price_above = alerts.get("price_above")
-    if price_above is not None and price_above > 0:
+    if price_above and price_above > 0:
         if last_close > float(price_above):
             msg = f"🚀 {symbol}: Fiyat {price_above} üzerine çıktı! (Şu an: {last_close:.2f})"
             messages.append(msg)
@@ -101,7 +101,7 @@ def check_alerts(symbol, df, rsi, macd_df, alerts):
 
     # Fiyat altı alarm
     price_below = alerts.get("price_below")
-    if price_below is not None and price_below > 0:
+    if price_below and price_below > 0:
         if last_close < float(price_below):
             msg = f"📉 {symbol}: Fiyat {price_below} altına indi! (Şu an: {last_close:.2f})"
             messages.append(msg)
@@ -214,6 +214,7 @@ else:
 st.caption(f"⏳ Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 time.sleep(int(refresh_seconds))
 st.rerun()
+
 
 
 
