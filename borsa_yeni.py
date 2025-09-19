@@ -85,27 +85,31 @@ def load_alerts():
 
 def check_alerts(symbol, df, rsi, macd_df, alerts):
     messages = []
+    
     last_close = df["Close"].iloc[-1]
+    if isinstance(last_close, pd.Series):
+        last_close = last_close.iloc[0]
+    last_close = float(last_close)
 
     # Fiyat üstü alarm
     price_above = alerts.get("price_above")
-    if price_above and pd.notna(price_above):
-        if last_close > price_above:
+    if price_above is not None and price_above > 0:
+        if last_close > float(price_above):
             msg = f"🚀 {symbol}: Fiyat {price_above} üzerine çıktı! (Şu an: {last_close:.2f})"
             messages.append(msg)
             save_alert(symbol, msg)
 
     # Fiyat altı alarm
     price_below = alerts.get("price_below")
-    if price_below and pd.notna(price_below):
-        if last_close < price_below:
+    if price_below is not None and price_below > 0:
+        if last_close < float(price_below):
             msg = f"📉 {symbol}: Fiyat {price_below} altına indi! (Şu an: {last_close:.2f})"
             messages.append(msg)
             save_alert(symbol, msg)
 
     # RSI alarm
     if rsi is not None and alerts.get("rsi_alert"):
-        last_rsi = rsi.iloc[-1]
+        last_rsi = float(rsi.iloc[-1])
         if last_rsi > 70:
             msg = f"🔥 {symbol}: RSI {last_rsi:.1f} → Aşırı Alım!"
             messages.append(msg); save_alert(symbol, msg)
@@ -115,8 +119,8 @@ def check_alerts(symbol, df, rsi, macd_df, alerts):
 
     # MACD alarm
     if macd_df is not None and len(macd_df) > 2 and alerts.get("macd_alert"):
-        macd_prev, macd_last = macd_df["MACD"].iloc[-2], macd_df["MACD"].iloc[-1]
-        signal_prev, signal_last = macd_df["Signal"].iloc[-2], macd_df["Signal"].iloc[-1]
+        macd_prev, macd_last = float(macd_df["MACD"].iloc[-2]), float(macd_df["MACD"].iloc[-1])
+        signal_prev, signal_last = float(macd_df["Signal"].iloc[-2]), float(macd_df["Signal"].iloc[-1])
         if macd_prev < signal_prev and macd_last > signal_last:
             msg = f"✅ {symbol}: MACD yukarı kesişim (Al sinyali)!"
             messages.append(msg); save_alert(symbol, msg)
@@ -125,8 +129,6 @@ def check_alerts(symbol, df, rsi, macd_df, alerts):
             messages.append(msg); save_alert(symbol, msg)
 
     return messages
-
-
 
 def to_excel(df):
     output = BytesIO()
@@ -212,6 +214,7 @@ else:
 st.caption(f"⏳ Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 time.sleep(int(refresh_seconds))
 st.rerun()
+
 
 
 
