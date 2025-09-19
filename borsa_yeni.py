@@ -1,17 +1,17 @@
-import time
-from datetime import datetime
 import numpy as np
 import pandas as pd
 import yfinance as yf
 import plotly.graph_objs as go
 import streamlit as st
-import os
 from io import BytesIO
 import platform
 import os
+from datetime import datetime
+from streamlit_autorefresh import st_autorefresh
 
-
-# Ses ve sistem bildirimi için
+# ----------------------
+# Bildirim ve ses
+# ----------------------
 try:
     if platform.system() == "Windows":
         import winsound
@@ -39,7 +39,7 @@ def compute_ma(df, windows):
 def compute_rsi(df, period=14):
     close = df["Close"]
     if isinstance(close, pd.DataFrame):
-        close = close.squeeze()  # Tek boyuta indir
+        close = close.squeeze()
     delta = close.diff()
     gain = np.where(delta > 0, delta, 0.0)
     loss = np.where(delta < 0, -delta, 0.0)
@@ -82,34 +82,35 @@ def load_alerts():
     log_file = "alerts_log.csv"
     if os.path.exists(log_file):
         return pd.read_csv(log_file)
-    else:
-        return pd.DataFrame(columns=["Tarih", "Sembol", "Mesaj"])
+    return pd.DataFrame(columns=["Tarih", "Sembol", "Mesaj"])
+
+def clear_alerts(mode="all", n=50):
+    log_file = "alerts_log.csv"
+    if not os.path.exists(log_file):
+        return
+    df = pd.read_csv(log_file)
+    if mode == "all":
+        df = pd.DataFrame(columns=df.columns)
+    elif mode == "last_n":
+        df = df.iloc[:-n] if len(df) > n else pd.DataFrame(columns=df.columns)
+    df.to_csv(log_file, index=False)
 
 def check_alerts(symbol, df, rsi, macd_df, alerts):
     messages = []
-    
-    last_close = df["Close"].iloc[-1]
-    if isinstance(last_close, pd.Series):
-        last_close = last_close.iloc[0]
-    last_close = float(last_close)
+    last_close = float(df["Close"].iloc[-1])
 
-    # Fiyat üstü alarm
     price_above = alerts.get("price_above")
-    if price_above and price_above > 0:
-        if last_close > float(price_above):
-            msg = f"🚀 {symbol}: Fiyat {price_above} üzerine çıktı! (Şu an: {last_close:.2f})"
-            messages.append(msg)
-            save_alert(symbol, msg)
+    if price_above and last_close > float(price_above):
+        msg = f"🚀 {symbol}: Fiyat {price_above} üzerine çıktı! (Şu an: {last_close:.2f})"
+        messages.append(msg)
+        save_alert(symbol, msg)
 
-    # Fiyat altı alarm
     price_below = alerts.get("price_below")
-    if price_below and price_below > 0:
-        if last_close < float(price_below):
-            msg = f"📉 {symbol}: Fiyat {price_below} altına indi! (Şu an: {last_close:.2f})"
-            messages.append(msg)
-            save_alert(symbol, msg)
+    if price_below and last_close < float(price_below):
+        msg = f"📉 {symbol}: Fiyat {price_below} altına indi! (Şu an: {last_close:.2f})"
+        messages.append(msg)
+        save_alert(symbol, msg)
 
-    # RSI alarm
     if rsi is not None and alerts.get("rsi_alert"):
         last_rsi = float(rsi.iloc[-1])
         if last_rsi > 70:
@@ -119,7 +120,6 @@ def check_alerts(symbol, df, rsi, macd_df, alerts):
             msg = f"❄️ {symbol}: RSI {last_rsi:.1f} → Aşırı Satım!"
             messages.append(msg); save_alert(symbol, msg)
 
-    # MACD alarm
     if macd_df is not None and len(macd_df) > 2 and alerts.get("macd_alert"):
         macd_prev, macd_last = float(macd_df["MACD"].iloc[-2]), float(macd_df["MACD"].iloc[-1])
         signal_prev, signal_last = float(macd_df["Signal"].iloc[-2]), float(macd_df["Signal"].iloc[-1])
@@ -136,29 +136,7 @@ def to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Alarmlar')
-        # writer.save() → artık gerek yok
     return output.getvalue()
-
-# Alarm geçmişini yükle
-def load_alerts():
-    log_file = "alerts_log.csv"
-    if os.path.exists(log_file):
-        return pd.read_csv(log_file)
-    else:
-        return pd.DataFrame(columns=["Tarih", "Sembol", "Mesaj"])
-
-# Alarm geçmişini temizle
-def clear_alerts(mode="all", n=50):
-    log_file = "alerts_log.csv"
-    if not os.path.exists(log_file):
-        return
-    df = pd.read_csv(log_file)
-    if mode == "all":
-        df = pd.DataFrame(columns=df.columns)  # tümünü temizle
-    elif mode == "last_n":
-        df = df.iloc[:-n] if len(df) > n else pd.DataFrame(columns=df.columns)
-    df.to_csv(log_file, index=False)
-
 
 # ----------------------
 # Streamlit Arayüzü
@@ -166,6 +144,9 @@ def clear_alerts(mode="all", n=50):
 st.set_page_config(page_title="Canlı Borsa Dashboard", layout="wide")
 st.title("📈 Canlı Borsa Dashboard")
 
+# ----------------------
+# Sidebar Ayarlar
+# ----------------------
 with st.sidebar:
     st.header("⚙️ Ayarlar")
     symbols_text = st.text_input("Hisseler (virgülle ayır):", "ASELS.IS, THYAO.IS")
@@ -187,49 +168,76 @@ with st.sidebar:
     macd_alert = st.checkbox("MACD uyarılarını aç", value=True)
 
 symbols = [s.strip() for s in symbols_text.split(",") if s.strip()]
-tabs = st.tabs(symbols)
-alerts_config = {"price_above": price_above if price_above > 0 else None,
-                 "price_below": price_below if price_below > 0 else None,
-                 "rsi_alert": rsi_alert,
-                 "macd_alert": macd_alert}
+alerts_config = {
+    "price_above": price_above if price_above > 0 else None,
+    "price_below": price_below if price_below > 0 else None,
+    "rsi_alert": rsi_alert,
+    "macd_alert": macd_alert
+}
 
+# ----------------------
+# Otomatik Yenileme
+# ----------------------
+st_autorefresh(interval=refresh_seconds * 1000, key="datarefresh")
+
+# ----------------------
+# Grafikleri ve Alarmları Göster
+# ----------------------
+tabs = st.tabs(symbols)
 def plot_symbol(tab, symbol):
     with tab:
         df = fetch_data(symbol, period, interval)
-        if df.empty: st.warning(f"{symbol} için veri alınamadı."); return
+        if df.empty: return
         ma_windows = [w for w, enabled in zip([10,20,50],[ma10,ma20,ma50]) if enabled]
         if ma_windows: df = compute_ma(df, ma_windows)
         rsi = compute_rsi(df) if show_rsi else None
         macd_df = compute_macd(df) if show_macd else None
+
+        # Fiyat grafiği
         fig = go.Figure()
         fig.add_trace(go.Candlestick(x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], name="Fiyat"))
-        for w in ma_windows: fig.add_trace(go.Scatter(x=df.index, y=df[f"MA{w}"], mode="lines", name=f"MA{w}"))
+        for w in ma_windows:
+            fig.add_trace(go.Scatter(x=df.index, y=df[f"MA{w}"], mode="lines", name=f"MA{w}"))
         fig.update_layout(title=f"{symbol} Fiyat Grafiği", xaxis_rangeslider_visible=False, template="plotly_dark")
         st.plotly_chart(fig, use_container_width=True)
+
+        # RSI grafiği
         if show_rsi and rsi is not None:
-            fig_rsi = go.Figure(); fig_rsi.add_trace(go.Scatter(x=rsi.index, y=rsi, mode="lines", name="RSI"))
-            fig_rsi.add_hline(y=70, line_dash="dash", line_color="red"); fig_rsi.add_hline(y=30, line_dash="dash", line_color="green")
-            fig_rsi.update_layout(title="RSI (14)", template="plotly_dark"); st.plotly_chart(fig_rsi, use_container_width=True)
+            fig_rsi = go.Figure()
+            fig_rsi.add_trace(go.Scatter(x=rsi.index, y=rsi, mode="lines", name="RSI"))
+            fig_rsi.add_hline(y=70, line_dash="dash", line_color="red")
+            fig_rsi.add_hline(y=30, line_dash="dash", line_color="green")
+            fig_rsi.update_layout(title="RSI (14)", template="plotly_dark")
+            st.plotly_chart(fig_rsi, use_container_width=True)
+
+        # MACD grafiği
         if show_macd and macd_df is not None:
             fig_macd = go.Figure()
             fig_macd.add_trace(go.Scatter(x=macd_df.index, y=macd_df["MACD"], mode="lines", name="MACD"))
             fig_macd.add_trace(go.Scatter(x=macd_df.index, y=macd_df["Signal"], mode="lines", name="Signal"))
             fig_macd.add_trace(go.Bar(x=macd_df.index, y=macd_df["Hist"], name="Hist"))
-            fig_macd.update_layout(title="MACD (12,26,9)", template="plotly_dark"); st.plotly_chart(fig_macd, use_container_width=True)
-        st.subheader("📋 Son 20 Kayıt"); st.dataframe(df.tail(20))
+            fig_macd.update_layout(title="MACD (12,26,9)", template="plotly_dark")
+            st.plotly_chart(fig_macd, use_container_width=True)
+
+        # Son fiyatlar
+        st.subheader("📋 Son 20 Kayıt")
+        st.dataframe(df.tail(20))
+
+        # Alarmlar
         alerts = check_alerts(symbol, df, rsi, macd_df, alerts_config)
         if alerts: st.error(" | ".join(alerts))
 
 for i, sym in enumerate(symbols): plot_symbol(tabs[i], sym)
 
-# Alarm geçmişi ve indirme
+# ----------------------
+# Alarm Geçmişi ve Temizleme
+# ----------------------
 st.divider()
 st.subheader("📜 Alarm Geçmişi")
 alerts_df = load_alerts()
 
-# Temizleme seçenekleri
-st.write("🧹 Alarm Geçmişini Temizle:")
-clear_option = st.selectbox("Seçenek:", ["Son 50", "Son 100", "Tümünü Temizle"])
+# Temizleme
+clear_option = st.selectbox("🧹 Alarm Geçmişini Temizle:", ["Son 50", "Son 100", "Tümünü Temizle"])
 if st.button("Temizle"):
     if clear_option == "Son 50":
         clear_alerts(mode="last_n", n=50)
@@ -238,9 +246,10 @@ if st.button("Temizle"):
     else:
         clear_alerts(mode="all")
     st.success("Alarm geçmişi güncellendi!")
-    st.experimental_rerun()  # sayfayı yenile
+    st.experimental_rerun()
 
-# Alarm tablosu ve Excel indirme
+# Tablo ve Excel indirme
+alerts_df = load_alerts()
 if not alerts_df.empty:
     st.dataframe(alerts_df)
     excel_data = to_excel(alerts_df)
@@ -251,12 +260,5 @@ if not alerts_df.empty:
 else:
     st.info("Henüz kaydedilmiş alarm yok.")
 
-from streamlit_autorefresh import st_autorefresh
-st_autorefresh(interval=refresh_seconds * 1000, key="datarefresh")
-
-
+# Son güncelleme
 st.caption(f"⏳ Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-time.sleep(int(refresh_seconds))
-st.rerun()
-
-
