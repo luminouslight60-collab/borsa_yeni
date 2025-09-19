@@ -86,26 +86,44 @@ def load_alerts():
 def check_alerts(symbol, df, rsi, macd_df, alerts):
     messages = []
     last_close = df["Close"].iloc[-1]
-    if alerts["price_above"] and last_close > alerts["price_above"]:
-        msg = f"🚀 {symbol}: Fiyat {alerts['price_above']} üzerine çıktı! (Şu an: {last_close:.2f})"
-        messages.append(msg); save_alert(symbol, msg)
-    if alerts["price_below"] and last_close < alerts["price_below"]:
-        msg = f"📉 {symbol}: Fiyat {alerts['price_below']} altına indi! (Şu an: {last_close:.2f})"
-        messages.append(msg); save_alert(symbol, msg)
-    if rsi is not None:
+
+    # Fiyat üstü alarm
+    if alerts.get("price_above") is not None:
+        if last_close > alerts["price_above"]:
+            msg = f"🚀 {symbol}: Fiyat {alerts['price_above']} üzerine çıktı! (Şu an: {last_close:.2f})"
+            messages.append(msg)
+            save_alert(symbol, msg)
+
+    # Fiyat altı alarm
+    if alerts.get("price_below") is not None:
+        if last_close < alerts["price_below"]:
+            msg = f"📉 {symbol}: Fiyat {alerts['price_below']} altına indi! (Şu an: {last_close:.2f})"
+            messages.append(msg)
+            save_alert(symbol, msg)
+
+    # RSI alarm
+    if rsi is not None and alerts.get("rsi_alert"):
         last_rsi = rsi.iloc[-1]
-        if last_rsi > 70 and alerts["rsi_alert"]:
-            msg = f"🔥 {symbol}: RSI {last_rsi:.1f} → Aşırı Alım!"; messages.append(msg); save_alert(symbol, msg)
-        if last_rsi < 30 and alerts["rsi_alert"]:
-            msg = f"❄️ {symbol}: RSI {last_rsi:.1f} → Aşırı Satım!"; messages.append(msg); save_alert(symbol, msg)
-    if macd_df is not None and len(macd_df) > 2:
+        if last_rsi > 70:
+            msg = f"🔥 {symbol}: RSI {last_rsi:.1f} → Aşırı Alım!"
+            messages.append(msg); save_alert(symbol, msg)
+        elif last_rsi < 30:
+            msg = f"❄️ {symbol}: RSI {last_rsi:.1f} → Aşırı Satım!"
+            messages.append(msg); save_alert(symbol, msg)
+
+    # MACD alarm
+    if macd_df is not None and len(macd_df) > 2 and alerts.get("macd_alert"):
         macd_prev, macd_last = macd_df["MACD"].iloc[-2], macd_df["MACD"].iloc[-1]
         signal_prev, signal_last = macd_df["Signal"].iloc[-2], macd_df["Signal"].iloc[-1]
-        if macd_prev < signal_prev and macd_last > signal_last and alerts["macd_alert"]:
-            msg = f"✅ {symbol}: MACD yukarı kesişim (Al sinyali)!"; messages.append(msg); save_alert(symbol, msg)
-        if macd_prev > signal_prev and macd_last < signal_last and alerts["macd_alert"]:
-            msg = f"⚠️ {symbol}: MACD aşağı kesişim (Sat sinyali)!"; messages.append(msg); save_alert(symbol, msg)
+        if macd_prev < signal_prev and macd_last > signal_last:
+            msg = f"✅ {symbol}: MACD yukarı kesişim (Al sinyali)!"
+            messages.append(msg); save_alert(symbol, msg)
+        elif macd_prev > signal_prev and macd_last < signal_last:
+            msg = f"⚠️ {symbol}: MACD aşağı kesişim (Sat sinyali)!"
+            messages.append(msg); save_alert(symbol, msg)
+
     return messages
+
 
 def to_excel(df):
     output = BytesIO()
@@ -191,4 +209,5 @@ else:
 st.caption(f"⏳ Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 time.sleep(int(refresh_seconds))
 st.rerun()
+
 
