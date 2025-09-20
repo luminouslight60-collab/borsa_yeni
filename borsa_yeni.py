@@ -253,7 +253,7 @@ if st.button("Temizle"):
         clear_alerts(mode="all")
         
     st.success("Alarm geçmişi güncellendi!")
-    st.experimental_rerun()
+    st.rerun()
 
 
 # Tablo ve Excel indirme
@@ -270,4 +270,5 @@ else:
 
 # Son güncelleme
 st.caption(f"⏳ Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
 
