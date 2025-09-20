@@ -84,15 +84,17 @@ def load_alerts():
         return pd.read_csv(log_file)
     return pd.DataFrame(columns=["Tarih", "Sembol", "Mesaj"])
 
-def clear_alerts(mode="all", n=50):
+def clear_alerts(mode="all", n=None):
     log_file = "alerts_log.csv"
     if not os.path.exists(log_file):
         return
     df = pd.read_csv(log_file)
+
     if mode == "all":
-        df = pd.DataFrame(columns=df.columns)
-    elif mode == "last_n":
-        df = df.iloc[:-n] if len(df) > n else pd.DataFrame(columns=df.columns)
+        df = pd.DataFrame(columns=df.columns)  # tümünü temizle
+    elif mode == "first_n" and n is not None:
+        df = df.iloc[n:] if len(df) > n else pd.DataFrame(columns=df.columns)  # ilk n kaydı sil
+
     df.to_csv(log_file, index=False)
 
 def check_alerts(symbol, df, rsi, macd_df, alerts):
@@ -237,16 +239,22 @@ st.subheader("📜 Alarm Geçmişi")
 alerts_df = load_alerts()
 
 # Temizleme
-clear_option = st.selectbox("🧹 Alarm Geçmişini Temizle:", ["Son 50", "Son 100", "Tümünü Temizle"])
+clear_option = st.selectbox("🧹 Alarm Geçmişini Temizle:", 
+                            ["İlk 25", "İlk 50", "İlk 75", "Tümünü Temizle"])
+
 if st.button("Temizle"):
-    if clear_option == "Son 50":
-        clear_alerts(mode="last_n", n=50)
-    elif clear_option == "Son 100":
-        clear_alerts(mode="last_n", n=100)
+    if clear_option == "İlk 25":
+        clear_alerts(mode="first_n", n=25)
+    elif clear_option == "İlk 50":
+        clear_alerts(mode="first_n", n=50)
+    elif clear_option == "İlk 75":
+        clear_alerts(mode="first_n", n=75)
     else:
         clear_alerts(mode="all")
+        
     st.success("Alarm geçmişi güncellendi!")
     st.experimental_rerun()
+
 
 # Tablo ve Excel indirme
 alerts_df = load_alerts()
@@ -262,3 +270,4 @@ else:
 
 # Son güncelleme
 st.caption(f"⏳ Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
